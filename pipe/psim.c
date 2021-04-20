@@ -731,7 +731,7 @@ void do_decode_stage()
     }
 
     // forwarding 
-    
+
     // switch(execute_input->srca) {
     //     case memory_input->deste:
     //         execute_input->vala = memory_input->vale;
@@ -771,18 +771,21 @@ void do_decode_stage()
     //         execute_input->valb = get_reg_val(reg, execute_input->srcb);
     //         break;
     // }
-    if (execute_input->srca == memory_input->deste)
-		execute_input->vala = memory_input->vale;
-	else if (execute_input->srca == writeback_input->destm)
-		execute_input->vala = writeback_input->valm;
-	else if (execute_input->srca == writeback_input->deste)
-		execute_input->vala = writeback_input->vale;
-	else if (execute_input->srca == writeback_output->destm)
-		execute_input->vala = writeback_output->valm;
-	else if (execute_input->srca == writeback_output->deste)
-		execute_input->vala = writeback_output->vale;
-	else
-		execute_input->vala = get_reg_val(reg, execute_input->srca);
+
+    if (!(decode_output->icode == I_JMP || decode_output->icode == I_CALL)) {
+        if (execute_input->srca == memory_input->deste)
+		    execute_input->vala = memory_input->vale;
+	    else if (execute_input->srca == writeback_input->destm)
+		    execute_input->vala = writeback_input->valm;
+	    else if (execute_input->srca == writeback_input->deste)
+		    execute_input->vala = writeback_input->vale;
+	    else if (execute_input->srca == writeback_output->destm)
+		    execute_input->vala = writeback_output->valm;
+	    else if (execute_input->srca == writeback_output->deste)
+		    execute_input->vala = writeback_output->vale;
+	    else
+		    execute_input->vala = get_reg_val(reg, execute_input->srca);
+    }
 	
 	if (execute_input->srcb == memory_input->deste)
 		execute_input->valb = memory_input->vale;
