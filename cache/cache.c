@@ -126,6 +126,17 @@ void free_cache(cache_t *cache)
 cache_line_t *get_line(cache_t *cache, uword_t addr)
 {
     /* your implementation */
+    unsigned int set_index = (addr >> cache->b) & (unsigned int)(pow(2, cache->s) - 1);
+    uword_t tag = (addr >> (cache->b + cache->s));
+    for (unsigned int i = 0; i < cache->E; i++) {
+        cache_line_t *cache_line = &cache->sets[set_index].lines[i];
+        if (cache_line->valid && cache_line->tag == tag) { 
+            hit_count++;
+            cache_line->lru = hit_count + miss_count;
+            return cache_line;
+        }
+    }
+    miss_count++;
     return NULL;
 }
 
@@ -136,7 +147,22 @@ cache_line_t *get_line(cache_t *cache, uword_t addr)
 cache_line_t *select_line(cache_t *cache, uword_t addr)
 {
     /* your implementation */
-    return NULL;
+    unsigned int set_index = (addr >> cache->b) & (unsigned int)(pow(2, cache->s) - 1);
+    cache_line_t *lowest_lru_line = &cache->sets[set_index].lines[0]; // default line
+    for (unsigned int i = 0; i < cache->E; i++) {
+        cache_line_t *cache_line = &cache->sets[set_index].lines[i];
+        if (!cache_line->valid) {
+            return cache_line;
+        } else if (cache_line->lru < lowest_lru_line->lru) {
+            lowest_lru_line = cache_line;
+        }
+    }
+    if (lowest_lru_line->dirty) {
+        dirty_eviction_count++;
+    } else {
+        clean_eviction_count++;
+    }
+    return lowest_lru_line;
 }
 
 /* TODO:
@@ -146,7 +172,11 @@ cache_line_t *select_line(cache_t *cache, uword_t addr)
 bool check_hit(cache_t *cache, uword_t addr, operation_t operation)
 {
     /* your implementation */
-    return false;
+    cache_line_t *cache_line = get_line(cache, addr);
+    if (cache_line && operation == WRITE) {
+        cache_line->dirty = true;
+    }
+    return cache_line != NULL;
 }
 
 /* TODO:
@@ -159,7 +189,30 @@ evicted_line_t *handle_miss(cache_t *cache, uword_t addr, operation_t operation,
     evicted_line_t *evicted_line = malloc(sizeof(evicted_line_t));
     evicted_line->data = (byte_t *) calloc(B, sizeof(byte_t));
     /* your implementation */
+
+    // LRU 
+    cache_line_t *replaced_line = select_line(cache, addr);
+    if (!replaced_line->valid) {
+        // replaced line was vacant, evicted line -> not valid
+        evicted_line->valid = false;
+       
+    } else {
+        // replaced line was occupied, evicted line -> valid, transfer info 
+        evicted_line->valid = true;
+        evicted_line->dirty = replaced_line->dirty;
+        // evicted_line->addr =
+        memcpy(evicted_line->data, replaced_line->data, B);
+    }
+    replaced_line->valid = true;
+    replaced_line->tag = (addr >> (cache->b + cache->s));
+    replaced_line->dirty = operation == WRITE;
+    replaced_line->lru = hit_count + miss_count;
+    if (incoming_data) {
+        memcpy(replaced_line->data, incoming_data, B);
+    }
+
     return evicted_line;
+    
 }
 
 /* TODO:

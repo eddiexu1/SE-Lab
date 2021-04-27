@@ -732,46 +732,6 @@ void do_decode_stage()
 
     // forwarding 
 
-    // switch(execute_input->srca) {
-    //     case memory_input->deste:
-    //         execute_input->vala = memory_input->vale;
-    //         break;
-    //     case writeback_input->destm:
-    //         execute_input->vala = writeback_input->valm;
-    //         break;
-    //     case writeback_input->deste:
-    //         execute_input->vala = writeback_input->vale;
-    //         break;
-    //     case writeback_output->destm:
-    //         execute_input->vala = writeback_output->valm;
-    //         break;
-    //     case writeback_output->deste:
-    //         execute_input->vala = writeback_output->vale;
-    //         break;
-    //     default:
-    //         execute_input->vala = get_reg_val(reg, execute_input->srca);
-    // }
-    // switch(execute_input->srcb) {
-    //     case memory_input->deste:
-    //         execute_input->valb = memory_input->vale;
-    //         break;
-    //     case writeback_input->destm:
-    //         execute_input->valb = writeback_input->valm;
-    //         break;
-    //     case writeback_input->deste:
-    //         execute_input->valb = writeback_input->vale;
-    //         break;
-    //     case writeback_output->destm:
-    //         execute_input->valb = writeback_output->valm;
-    //         break;
-    //     case writeback_output->deste:
-    //         execute_input->valb = writeback_output->vale;
-    //         break;
-    //     default:
-    //         execute_input->valb = get_reg_val(reg, execute_input->srcb);
-    //         break;
-    // }
-
     if (!(decode_output->icode == I_JMP || decode_output->icode == I_CALL)) {
         if (execute_input->srca == memory_input->deste)
 		    execute_input->vala = memory_input->vale;
@@ -903,6 +863,12 @@ void do_execute_stage()
 
     memory_input->vale = compute_alu(alufun, alua, alub);
 
+    if (memory_output->status == STAT_HLT || memory_output->status == STAT_INS || 
+        memory_output->status == STAT_ADR || writeback_output->status == STAT_HLT || 
+        writeback_output->status == STAT_INS || writeback_output->status == STAT_ADR) {
+        setcc = false;
+    }
+
     /* logging functions, do not change these */
     if (execute_output->icode == I_JMP) {
         sim_log("\tExecute: instr = %s, cc = %s, branch %staken\n",
@@ -927,6 +893,10 @@ void do_memory_stage()
 {
 
     dmem_error = false;
+    mem_addr = 0;
+    mem_data = 0;
+    mem_read = false;
+    mem_write = false;
 
     // set default values for writeback_input
     writeback_input->icode = memory_output->icode;
@@ -970,6 +940,7 @@ void do_memory_stage()
 
         case I_RET:
             mem_read = true;
+            mem_addr = memory_output->vala;
             dmem_error |= !get_word_val(mem, memory_output->vala, &writeback_input->valm);
             break;
 
@@ -981,20 +952,13 @@ void do_memory_stage()
 
         case I_POPQ:
             mem_read = true;
+            mem_addr = memory_output->vala;
             dmem_error |= !get_word_val(mem, memory_output->vala, &writeback_input->valm);
             break;
 
         default:
             printf("icode is not valid (%d)", memory_output->icode);
             break;
-    }
-
-    // override current status if memory error
-    if (dmem_error) {
-        writeback_input->status = STAT_ADR;
-        if (mem_read) {
-            writeback_input->destm = REG_NONE;
-        }
     }
 
     if (mem_read) {
@@ -1011,6 +975,14 @@ void do_memory_stage()
             sim_log("\tMemory: Couldn't write to address 0x%llx\n", mem_addr);
         } else {
             sim_log("\tMemory: Wrote 0x%llx to address 0x%llx\n", mem_data, mem_addr);
+        }
+    }
+
+    // override current status if memory error
+    if (dmem_error) {
+        writeback_input->status = STAT_ADR;
+        if (mem_read) {
+            writeback_input->destm = REG_NONE;
         }
     }
 
@@ -1082,14 +1054,27 @@ void do_stall_check()
     bool combo_B = check_ret && check_load && memory_input->destm == REG_RSP;
 
     // set ops 
-    if (combo_A) {
+    if (memory_output->status == STAT_HLT || memory_output->status == STAT_INS || 
+        memory_output->status == STAT_ADR) {
+        fetch_state->op     = pipe_cntl("PC", false, false);
+        decode_state->op    = pipe_cntl("ID", false, false);
+        execute_state->op   = pipe_cntl("EX", false, false);
+        memory_state->op    = pipe_cntl("MEM", false, true);
+        writeback_state->op = pipe_cntl("WB", false, false);
+    } else if (writeback_output->status == STAT_HLT || writeback_output->status == STAT_INS || 
+        writeback_output->status == STAT_ADR) {
+        fetch_state->op     = pipe_cntl("PC", true, false);
+        decode_state->op    = pipe_cntl("ID", true, false);
+        execute_state->op   = pipe_cntl("EX", true, false);
+        memory_state->op    = pipe_cntl("MEM", true, false);
+        writeback_state->op = pipe_cntl("WB", true, false);
+    } else if (combo_A) {
         fetch_state->op     = pipe_cntl("PC", true, false);
         decode_state->op    = pipe_cntl("ID", false, true);
         execute_state->op   = pipe_cntl("EX", false, true);
         memory_state->op    = pipe_cntl("MEM", false, false);
         writeback_state->op = pipe_cntl("WB", false, false);
-    }
-    else if (combo_B) {
+    } else if (combo_B) {
         fetch_state->op     = pipe_cntl("PC", true, false);
         decode_state->op    = pipe_cntl("ID", true, false);
         execute_state->op   = pipe_cntl("EX", false, true);
