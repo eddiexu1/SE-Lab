@@ -925,7 +925,8 @@ void do_memory_stage()
 
         case I_MRMOVQ:
             mem_read = true;
-            dmem_error |= !get_word_val(mem, memory_output->vale, &writeback_input->valm);
+            mem_addr = memory_output->vale;
+            // dmem_error |= !get_word_val(mem, memory_output->vale, &writeback_input->valm);
             break;
 
         case I_ALU: break;
@@ -941,7 +942,7 @@ void do_memory_stage()
         case I_RET:
             mem_read = true;
             mem_addr = memory_output->vala;
-            dmem_error |= !get_word_val(mem, memory_output->vala, &writeback_input->valm);
+            // dmem_error |= !get_word_val(mem, memory_output->vala, &writeback_input->valm);
             break;
 
         case I_PUSHQ:
@@ -953,7 +954,7 @@ void do_memory_stage()
         case I_POPQ:
             mem_read = true;
             mem_addr = memory_output->vala;
-            dmem_error |= !get_word_val(mem, memory_output->vala, &writeback_input->valm);
+            // dmem_error |= !get_word_val(mem, memory_output->vala, &writeback_input->valm);
             break;
 
         default:
@@ -965,6 +966,7 @@ void do_memory_stage()
         if ((dmem_error |= !get_word_val(mem, mem_addr, &mem_data))) {
             sim_log("\tMemory: Couldn't Read from 0x%llx\n", mem_addr);
         } else {
+            writeback_input->valm = mem_data;
             sim_log("\tMemory: Read 0x%llx from 0x%llx\n",
                 mem_data, mem_addr);
         }

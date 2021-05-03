@@ -200,7 +200,8 @@ evicted_line_t *handle_miss(cache_t *cache, uword_t addr, operation_t operation,
         // replaced line was occupied, evicted line -> valid, transfer info 
         evicted_line->valid = true;
         evicted_line->dirty = replaced_line->dirty;
-        // evicted_line->addr =
+        evicted_line->addr = (replaced_line->tag << (cache->s + cache->b)) + 
+            (((addr >> cache->b) & (unsigned int)(pow(2, cache->s) - 1)) << cache->b); 
         memcpy(evicted_line->data, replaced_line->data, B);
     }
     replaced_line->valid = true;
@@ -222,6 +223,9 @@ evicted_line_t *handle_miss(cache_t *cache, uword_t addr, operation_t operation,
 void get_byte_cache(cache_t *cache, uword_t addr, byte_t *dest)
 {
     /* your implementation */
+    cache_line_t *line = get_line(cache, addr);
+    unsigned int offset = addr & (unsigned int)(pow(2, cache->b) - 1);
+    *dest = line->data[offset];
 }
 
 
@@ -232,6 +236,16 @@ void get_byte_cache(cache_t *cache, uword_t addr, byte_t *dest)
 void get_word_cache(cache_t *cache, uword_t addr, word_t *dest) {
 
     /* your implementation */
+    
+    word_t val;
+    val = 0;
+    for (int i = 0; i < 8; i++) {
+        cache_line_t *line = get_line(cache, addr + i);
+        unsigned int offset = (addr + i) & (unsigned int)(pow(2, cache->b) - 1);
+	    word_t b =  line->data[offset] & 0xFF;
+	    val = val | (b << (8*i));
+    }
+    *dest = val;
 }
 
 
@@ -243,6 +257,10 @@ void set_byte_cache(cache_t *cache, uword_t addr, byte_t val)
 {
 
     /* your implementation */
+    cache_line_t *line = get_line(cache, addr);
+    unsigned int offset = addr & (unsigned int)(pow(2, cache->b) - 1);
+    line->data[offset] = val;
+    
 }
 
 
@@ -253,6 +271,12 @@ void set_byte_cache(cache_t *cache, uword_t addr, byte_t val)
 void set_word_cache(cache_t *cache, uword_t addr, word_t val)
 {
     /* your implementation */
+    for (int i = 0; i < 8; i++) {
+        cache_line_t *line = get_line(cache, addr + i);
+        unsigned int offset = (addr + i) & (unsigned int)(pow(2, cache->b) - 1);
+	    line->data[offset] = (byte_t) val & 0xFF;
+	    val >>= 8;
+    }
 }
 
 /*
