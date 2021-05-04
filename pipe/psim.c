@@ -615,6 +615,28 @@ void do_fetch_stage()
             decode_input->rb = LO4(tempB);
             decode_input->valp = f_pc + 2;
             break;
+        
+        case I_LEAQ:
+            imem_error |= !get_byte_val(mem, f_pc + 1, &tempB);
+            decode_input->ra = HI4(tempB);
+            decode_input->rb = LO4(tempB);
+            imem_error |= !get_word_val(mem, f_pc + 2, &decode_input->valc);
+            decode_input->valp = f_pc + 10;
+            break;
+
+        case I_VECADD:
+            imem_error |= !get_byte_val(mem, f_pc + 1, &tempB);
+            decode_input->ra = HI4(tempB);
+            decode_input->rb = LO4(tempB);
+            decode_input->valp = f_pc + 2;
+            break;
+
+        case I_SHF:
+            imem_error |= !get_byte_val(mem, f_pc + 1, &tempB);
+            decode_input->ra = HI4(tempB);
+            decode_input->rb = LO4(tempB);
+            decode_input->valp = f_pc + 2;
+            break;
 
         default:
             instr_valid = false;
@@ -723,6 +745,23 @@ void do_decode_stage()
             execute_input->srcb = REG_RSP;
             execute_input->deste = REG_RSP;
             execute_input->destm = decode_output->ra;
+            break;
+
+        case I_LEAQ:
+            execute_input->srca = decode_output->rb;
+            execute_input->deste = decode_output->ra;
+            break;
+
+        case I_VECADD:
+            execute_input->srca = decode_output->ra;
+            execute_input->srcb = decode_output->rb;
+            execute_input->deste = decode_output->rb;
+            break;
+
+        case I_SHF:
+            execute_input->srca = decode_output->ra;
+            execute_input->srcb = decode_output->rb;
+            execute_input->deste = decode_output->rb;
             break;
 
         default:
@@ -856,12 +895,56 @@ void do_execute_stage()
             alub = execute_output->valb;
             break;
 
+        case I_LEAQ:
+            alufun = A_ADD;
+            alua = execute_output->vala;
+            alub = execute_output->valc;
+            break;
+
+        case I_VECADD: ;
+            int zf = 1;
+            int sf = 0;
+            char *a = (char*)&execute_output->vala;
+            char *b = (char*)&execute_output->valb;
+            char *e = (char*)&memory_input->vale;
+            for (int i = 0; i < 8; i++) {
+                e[i] = a[i] + b[i];
+                // check condition codes
+                zf &= (e[i] == 0);
+                sf |= ((e[i] >> 7) != 0);
+            }
+            cc_in = PACK_CC(zf, sf, 0);
+            setcc = true;
+            break;
+
+        case I_SHF:
+            switch ((shf_t)execute_output->ifun) {
+                case S_AR:
+                    memory_input->vale = execute_output->valb >> execute_output->vala;
+                    break;
+                case S_HL:
+                    memory_input->vale = execute_output->valb << execute_output->vala;
+                    break;
+                case S_HR:
+                    memory_input->vale = ((unsigned long long) execute_output->valb) >> execute_output->vala;
+                    break;
+                case S_NONE:
+                    memory_input->vale = 0;
+                    break;
+            }
+            cc_in = PACK_CC(memory_input->vale == 0, memory_input->vale < 0, 0);
+            setcc = true;
+            break;
+
         default:
             printf("icode is not valid (%d)", execute_output->icode);
             break;
     }
 
-    memory_input->vale = compute_alu(alufun, alua, alub);
+    if (execute_output->icode != I_VECADD && execute_output->icode != I_SHF) {
+        memory_input->vale = compute_alu(alufun, alua, alub);
+    }
+    
 
     if (memory_output->status == STAT_HLT || memory_output->status == STAT_INS || 
         memory_output->status == STAT_ADR || writeback_output->status == STAT_HLT || 
@@ -926,7 +1009,6 @@ void do_memory_stage()
         case I_MRMOVQ:
             mem_read = true;
             mem_addr = memory_output->vale;
-            // dmem_error |= !get_word_val(mem, memory_output->vale, &writeback_input->valm);
             break;
 
         case I_ALU: break;
@@ -942,7 +1024,6 @@ void do_memory_stage()
         case I_RET:
             mem_read = true;
             mem_addr = memory_output->vala;
-            // dmem_error |= !get_word_val(mem, memory_output->vala, &writeback_input->valm);
             break;
 
         case I_PUSHQ:
@@ -954,8 +1035,13 @@ void do_memory_stage()
         case I_POPQ:
             mem_read = true;
             mem_addr = memory_output->vala;
-            // dmem_error |= !get_word_val(mem, memory_output->vala, &writeback_input->valm);
             break;
+
+        case I_LEAQ: break;
+
+        case I_VECADD: break;
+
+        case I_SHF: break;
 
         default:
             printf("icode is not valid (%d)", memory_output->icode);

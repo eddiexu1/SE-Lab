@@ -953,7 +953,6 @@ void do_memory_stage()
         case I_MRMOVQ:
             mem_read = true;
             mem_addr = memory_output->vale;
-            // dmem_status = get_word_val_D(mem, memory_output->vale, &writeback_input->valm);
             break;
 
         case I_ALU: break;
@@ -969,7 +968,6 @@ void do_memory_stage()
         case I_RET:
             mem_read = true;
             mem_addr = memory_output->vala;
-            // dmem_status = get_word_val_D(mem, memory_output->vala, &writeback_input->valm);
             break;
 
         case I_PUSHQ:
@@ -981,7 +979,6 @@ void do_memory_stage()
         case I_POPQ:
             mem_read = true;
             mem_addr = memory_output->vala;
-            // dmem_status = get_word_val_D(mem, memory_output->vala, &writeback_input->valm);
             break;
 
         default:
