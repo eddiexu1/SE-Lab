@@ -1,2 +1,16 @@
-                            | # Design your own testcase here
-0x000: 00                   | halt
+                            | # custom test
+                            | # /* $begin myprog-ys */
+                            | # myprog
+0x000: 30f38300000000000000 |     irmovq $131, %rbx 
+0x00a: 30f1b300000000000000 |     irmovq $179, %rcx 
+0x014: 6131                 |     subq %rbx, %rcx
+0x016: 30f20700000000000000 |     irmovq $7, %rdx
+0x020: 6221                 |     andq %rdx, %rcx 
+0x022: 733600000000000000   |     je divbyeight
+0x02b: 30f23200000000000000 |     irmovq $50, %rdx
+0x035: 00                   |     halt
+0x036:                      | divbyeight:
+0x036: 30f26400000000000000 |     irmovq $100, %rdx
+                            | # /* $end myprog-ys */
+0x040: 00                   |     halt
+                            | 

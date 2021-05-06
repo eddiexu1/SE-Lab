@@ -1,2 +1,16 @@
-# Design your own testcase here
-halt
+# custom test
+# /* $begin myprog-ys */
+# myprog
+    irmovq $131, %rbx 
+    irmovq $179, %rcx 
+    subq %rbx, %rcx
+    irmovq $7, %rdx
+    andq %rdx, %rcx 
+    je divbyeight
+    irmovq $50, %rdx
+    halt
+divbyeight:
+    irmovq $100, %rdx
+# /* $end myprog-ys */
+    halt
+
